@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>CSV Parser</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+</head>
+
+<body style="display: table-cell;height:100vh;width:100vw; overflow: hidden;">
+    <iframe style="display: none;" id="CurrentPath" onload="checkForData()"></iframe>
+    <div style="display: flex; flex-direction: column; height:100%;width:100%">
+        <div style="display: flex;padding:0.5em;">
+            <select style="flex:1;height:30px;" id="FileList" onchange="changeFile(this)"></select>
+            <button style="width:100px;height: 30px;" onclick="addRow()">Add Row</button>
+            <button style="width:100px;height: 30px;" onclick="saveFile()">Save</button>
+        </div>
+        <div style="flex-grow: 1;display: flex;">
+            <div id="loading" style="display:flex;align-items: center;justify-content: center;width:100%;">
+                <p>Loading...</p>
+            </div>
+            <div id="Loaded" style="width:100%;padding:0.5em;background: #e8e5e5;">
+                <table id="CSVData" style="width:98vw; height:87vh;display: block; overflow: scroll; background: #fff;">
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+<script>
+    var path = window.location.href;
+    var src = path.replace('index.html', '');
+    var files = [];
+    var currentFile = '';
+    var header = '';
+    var index = 0;
+    var iframe = document.getElementById('CurrentPath');
+    iframe.setAttribute('src', src);
+
+    function checkForData() {
+        var element = document.getElementById('CurrentPath');
+        console.log(element.contentWindow);
+        console.log(element.contentWindow.document);
+        console.log(element.contentWindow.document.querySelector('body table tbody'));
+        console.log(element.contentWindow.document.querySelector('body table tbody').querySelector('tr').children[0].innerText);
+        let rows = element.contentWindow.document.querySelector('body table tbody').children;
+        for (let i = 0; i < rows.length; i++) {
+            let text = rows[i].querySelector('td').innerText;
+            console.log(text);
+            if (text.indexOf('.') == -1) {
+                files.push({
+                    file_name: text,
+                    path: src + text
+                })
+            }
+        }
+        console.log(files)
+        updateOptions();
+    }
+
+    function updateOptions() {
+        let select = document.getElementById('FileList')
+        for (let i = 0; i < files.length; i++) {
+            var option = document.createElement("option");
+            option.text = '/' + files[i].file_name;
+            option.value = files[i].path;
+            select.options.add(option, 1);
+        }
+        loadFile(files[0].path)
+    }
+
+    function changeFile(element) {
+        let file_path = element.value;
+        console.log(file_path);
+        loadFile(file_path);
+    }
+
+    function loadFile(path) {
+        showLoader(true);
+        currentFile = path;
+        path = path + '/data.csv'
+        var rawFile = new XMLHttpRequest();
+        rawFile.open("GET", path, true);
+        rawFile.onreadystatechange = function () {
+            if (rawFile.readyState === 4) {
+                if (rawFile.status === 200 || rawFile.status == 0) {
+                    var allText = rawFile.responseText;
+                    console.log(allText);
+                    loadTable(allText);
+                }
+            }
+        }
+        rawFile.send(null);
+    }
+
+    function loadTable(content) {
+        let table = document.getElementById('CSVData');
+        if (table.querySelector('thead')) {
+            table.querySelector('thead').remove();
+            table.querySelector('tbody').remove();
+        }
+        let rows = content.split('\n');
+        header = rows.shift();
+        let values = rows;
+        setTHeader(table, header);
+        setTBody(table, values);
+        showLoader(false);
+    }
+
+    function showLoader(state) {
+        let loader = document.getElementById('loading');
+        let table = document.getElementById('Loaded');
+        loader.style.display = state ? 'flex' : 'none';
+        table.style.display = !state ? 'flex' : 'none';
+    }
+
+    function setTHeader(table, data) {
+        data = data.split(',');
+        let thead = table.createTHead();
+        thead.style.background = '#c1c1c1';
+        let row = thead.insertRow();
+        row.style.display = 'table';
+        row.style.width = '100%';
+        row.style["table-layout"] = 'fixed';
+
+        let thIndex = document.createElement("th");
+        let thIndexText = document.createTextNode("");
+        thIndex.appendChild(thIndexText);
+        thIndex.style.width = '26px';
+        row.appendChild(thIndex);
+        for (let key of data) {
+            let th = document.createElement("th");
+            let text = document.createTextNode(key);
+            th.appendChild(text);
+            row.appendChild(th);
+        }
+        let th = document.createElement("th");
+        let text = document.createTextNode("");
+        th.appendChild(text);
+        th.style.width = '65px';
+        row.appendChild(th);
+    }
+
+    function setTBody(table, rows) {
+        let tbody = table.createTBody();
+        index = 1;
+        for (let row of rows) {
+            let data = row.split(',');
+            let rowElement = tbody.insertRow();
+            rowElement.id = 'row_' + index;
+            rowElement.style.display = 'table';
+            rowElement.style["min-width"] = "100%";
+            rowElement.style.width = 'max-content';
+            rowElement.style["table-layout"] = 'fixed';
+
+            let thIndex = document.createElement("td");
+            let text = document.createTextNode(index);
+            thIndex.appendChild(text);
+            thIndex.style.width = '26px';
+            rowElement.appendChild(thIndex);
+
+            for (let key of data) {
+                let th = document.createElement("td");
+                let input = document.createElement("input");
+                input.type = 'text';
+                input.value = key;
+                input.style.width = '100%';
+                th.appendChild(input);
+                rowElement.appendChild(th);
+            }
+            let th = document.createElement("td");
+            let button = document.createElement("button");
+            button.type = 'button';
+            button.name = 'but_' + index;
+            button.innerHTML = "remove";
+            button.style.width = '65px';
+            button.addEventListener('click', function () {
+                let id = this.name.replace('but', 'row');
+                let element = document.getElementById(id);
+                element.remove();
+            })
+            th.appendChild(button);
+            th.style.width = '65px';
+            rowElement.appendChild(th);
+            index++;
+        }
+    }
+
+    function addRow() {
+        let noOfColumns = header.split(',').length;
+        let table = document.getElementById('CSVData');
+        let tbody = table.querySelector('tbody');
+        tbody.style.overflow = 'scroll'
+        let rowElement = tbody.insertRow();
+        rowElement.id = 'row_' + index;
+        rowElement.style.display = 'table';
+        rowElement.style["min-width"] = "100%";
+        rowElement.style.width = 'max-content';
+        rowElement.style["table-layout"] = 'fixed';
+
+        let thIndex = document.createElement("td");
+        let text = document.createTextNode(index);
+        thIndex.appendChild(text);
+        thIndex.style.width = '26px';
+        rowElement.appendChild(thIndex);
+
+        for (let i = 0; i < noOfColumns; i++) {
+            let th = document.createElement("td");
+            let input = document.createElement("input");
+            input.type = 'text';
+            input.value = '';
+            input.style.width = '100%';
+            th.appendChild(input);
+            rowElement.appendChild(th);
+        }
+        let th = document.createElement("td");
+        let button = document.createElement("button");
+        button.type = 'button';
+        button.name = 'but_' + index;
+        button.innerHTML = "remove";
+        button.style.width = '65px';
+        button.addEventListener('click', function () {
+            let id = this.name.replace('but', 'row');
+            let element = document.getElementById(id);
+            element.remove();
+        })
+        th.appendChild(button);
+        th.style.width = '65px';
+        rowElement.appendChild(th);
+        index++;
+    }
+
+    function saveFile() {
+        let csvData = '';
+        let fileName = currentFile.split('/').slice(-1)[0] + '-data.csv';
+        let tableElement = document.getElementById('CSVData');
+        let tableHeaders = tableElement.querySelector('thead').rows[0].children;
+        let headerRow = [];
+        for (let ele of tableHeaders) {
+            if (ele.innerText) {
+                headerRow.push(ele.innerText);
+            }
+        }
+        csvData = headerRow.join(',') + '\n';
+
+        let tableBodyRows = tableElement.querySelector('tbody').rows;
+        for (let tableBodyRow of tableBodyRows) {
+            let rowData = [];
+            for (let tableData of tableBodyRow.children) {
+                console.log(tableData.children);
+                if (tableData.children[0] && tableData.children[0].type == 'text') {
+                    rowData.push(tableData.children[0].value);
+                }
+            }
+            csvData = csvData + rowData.join(',') + '\n';
+        }
+        csvData = csvData.slice(0, -1);
+        console.log(csvData);
+        download_csv(fileName, csvData);
+    }
+
+    function download_csv(fileName, csvData) {
+        // data.forEach(function (row) {
+        //     csv += row.join(',');
+        //     csv += "\n";
+        // });
+        console.log(csvData);
+        var hiddenElement = document.createElement('a');
+        hiddenElement.href = 'data:text/csv;charset=utf-8,' + encodeURI(csvData);
+        hiddenElement.target = '_blank';
+        hiddenElement.download = fileName;
+        hiddenElement.click();
+    }
+
+</script>
+
+</html>
